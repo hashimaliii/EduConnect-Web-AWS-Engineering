@@ -1,0 +1,1 @@
+{"Modules":[{"Key":"","Source":"","Dir":"."},{"Key":"private_db","Source":"../../modules/compute","Dir":"../../modules/compute"},{"Key":"public_web","Source":"../../modules/compute","Dir":"../../modules/compute"},{"Key":"security","Source":"../../modules/security","Dir":"../../modules/security"},{"Key":"vpc","Source":"../../modules/vpc","Dir":"../../modules/vpc"}]}
