@@ -1,0 +1,42 @@
+=== EduConnect Kubernetes Setup ===
+
+1. Start Minikube (with metrics-server for HPA):
+   minikube start
+   minikube addons enable metrics-server
+
+2. Check available storage classes:
+   kubectl get sc
+   # If "standard" is not listed, update storageClassName in mongo-ss.yaml
+   # and pv.yaml to match one that exists.
+
+3. Apply all manifests in order:
+   kubectl apply -f infra/pv.yaml          # PersistentVolumes (local/minikube only)
+   kubectl apply -f infra/secret.yaml      # JWT secret
+   kubectl apply -f infra/mongo-ss.yaml    # MongoDB StatefulSet + headless Service
+   kubectl apply -f infra/server.yaml      # Backend Deployment + ClusterIP Service
+   kubectl apply -f infra/client.yaml      # Frontend Deployment + LoadBalancer Service
+   kubectl apply -f infra/hpa.yaml         # Horizontal Pod Autoscalers
+
+4. Wait for MongoDB pods to be Running:
+   kubectl get pods -w
+
+5. Initialise the MongoDB replica set (only needed once):
+   kubectl exec -it mongo-0 -- mongosh --eval "rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo-0.mongo:27017' }, { _id: 1, host: 'mongo-1.mongo:27017' }, { _id: 2, host: 'mongo-2.mongo:27017' }] })"
+
+6. Verify replica set status:
+   kubectl exec -it mongo-0 -- mongosh --eval "rs.status()"
+
+7. Test inter-pod connectivity:
+   kubectl exec -it mongo-0 -- mongosh --host mongo-1.mongo --eval "db.adminCommand('ping')"
+   # Should return { ok: 1 }
+
+8. Get the frontend URL:
+   minikube service client-svc --url
+
+9. Check HPA status:
+   kubectl get hpa
+
+--- Teardown ---
+kubectl delete -f infra/
+# PVCs from StatefulSet must be deleted manually:
+kubectl delete pvc mongo-volume-mongo-0 mongo-volume-mongo-1 mongo-volume-mongo-2

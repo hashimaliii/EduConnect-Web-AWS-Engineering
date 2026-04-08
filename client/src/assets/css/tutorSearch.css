@@ -1,0 +1,125 @@
+body {
+    background-color: #f5f5f5;
+    margin: 0;
+    font-family: Arial, sans-serif;
+    color: #000;
+}
+
+.search-container {
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 30px;
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+}
+
+.search-container h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.filters {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    margin-bottom: 20px;
+}
+
+.filters input,
+.filters select {
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    color: #000;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    grid-column: span 2;
+}
+
+.actions button {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    background-color: #0a74da;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.actions button:hover {
+    background-color: #095bb5;
+}
+
+.tutor-card {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    background-color: #fff;
+    color: #000;
+}
+
+.tutor-card h3 {
+    margin: 0 0 8px 0;
+}
+
+.tutor-card p {
+    margin: 4px 0;
+}
+
+.tutor-card button {
+    margin-top: 8px;
+    margin-right: 10px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.tutor-card button:first-of-type {
+    background-color: #e91e63;
+    color: #fff;
+}
+
+.tutor-card button:first-of-type:hover {
+    background-color: #c2185b;
+}
+
+.tutor-card button:last-of-type {
+    background-color: #4caf50;
+    color: white;
+}
+
+.tutor-card button:last-of-type:hover {
+    background-color: #388e3c;
+}
+
+.wishlist-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.wishlist-header p {
+    font-size: 16px;
+    font-weight: bold;
+    margin: 0;
+}
+
+.wishlist-filters select,
+.wishlist-filters input[type="number"] {
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    color: #000;
+}

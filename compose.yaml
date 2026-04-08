@@ -1,0 +1,31 @@
+services:
+  mongodb:
+      image: mongodb/mongodb-community-server:latest
+      container_name: mongodb
+      restart: unless-stopped
+      ports:
+          - 27017:27017
+      volumes:
+          - mongodb:/data/db
+  server:
+    image: hashimaliii/server:v1.0
+    env_file:
+      - server/.env
+    ports:
+      - 5000:5000
+    depends_on:
+      - mongodb
+  client:
+    image: hashimaliii/client:v1.0
+    env_file:
+      - client/.env
+    ports:
+      - 5173:5173
+
+networks:
+  client:
+  server:
+
+volumes:
+    mongodb:
+        external: true
