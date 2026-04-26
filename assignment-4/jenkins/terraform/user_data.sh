@@ -11,9 +11,11 @@ echo "=== Starting Jenkins Controller Setup ==="
 echo "Updating package list..."
 apt-get update -y
 
-# Install Java 17 (JDK)
-echo "Installing Java 17..."
+# Fix Java CA certificates (critical for Jenkins plugin downloads)
+apt-get update -y
 apt-get install -y openjdk-17-jdk
+apt-get install --reinstall ca-certificates-java -y
+update-ca-certificates -f
 
 # Install Git
 echo "Installing Git..."
@@ -51,36 +53,38 @@ if ! command -v terraform &> /dev/null; then
     rm /tmp/terraform.zip
 fi
 
-# Install Trivy using official repository (More reliable)
+# Install Trivy using official repository
 echo "Installing Trivy..."
 if ! command -v trivy &> /dev/null; then
-    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
-    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
-    apt-get update -y
-    apt-get install trivy -y
+    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" > /etc/apt/sources.list.d/trivy.list
+    apt-get update -y || true
+    apt-get install trivy -y || true
 fi
 
-# Add Jenkins APT repository and install Jenkins
-echo "Installing Jenkins LTS..."
+# Install Node.js v18 (Official Nodesource method)
+echo "Installing Node.js v18..."
+if ! command -v node &> /dev/null; then
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - || true
+    apt-get install -y nodejs || true
+fi
+
+# Add Jenkins (DIRECT INSTALL LATEST VERSION)
+echo "Installing Latest Jenkins LTS (Direct Download)..."
 if ! command -v jenkins &> /dev/null; then
-    # Add Jenkins key using non-deprecated method
-    curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
-    echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
-    
-    # Update and install Jenkins
+    # Install dependencies first
     apt-get update -y
-    apt-get install -y jenkins
+    apt-get install -y daemon psmisc net-tools
+    
+    # Download a specific recent stable version (2.492.1)
+    wget -q https://pkg.jenkins.io/debian-stable/binary/jenkins_2.492.1_all.deb -O /tmp/jenkins.deb
+    
+    # Install via dpkg
+    dpkg -i /tmp/jenkins.deb || apt-get install -f -y
     
     # Start Jenkins
     systemctl enable jenkins
     systemctl start jenkins
-fi
-
-# Install Node.js (for sample app in Task 2)
-echo "Installing Node.js..."
-if ! command -v node &> /dev/null; then
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-    apt-get install -y nodejs
 fi
 
 # Install Docker Compose
@@ -92,4 +96,12 @@ fi
 
 echo "=== Jenkins Controller Setup Complete ==="
 echo "Jenkins Initial Admin Password:"
-cat /var/lib/jenkins/secrets/initialAdminPassword || echo "Jenkins not started yet"
+# Wait up to 60 seconds for the password file to appear
+for i in {1..12}; do
+    if [ -f /var/lib/jenkins/secrets/initialAdminPassword ]; then
+        cat /var/lib/jenkins/secrets/initialAdminPassword
+        break
+    fi
+    echo "Waiting for Jenkins to generate password... ($i)"
+    sleep 5
+done

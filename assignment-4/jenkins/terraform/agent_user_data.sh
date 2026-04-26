@@ -8,6 +8,13 @@ exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 echo "=== Starting Jenkins Agent Setup ==="
 
 # Update and install prerequisites
+# Add 2GB Swap space to handle memory pressure
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' | tee -a /etc/fstab
+
 echo "Updating package list..."
 apt-get update -y
 
@@ -98,3 +105,20 @@ if ! command -v docker-compose &> /dev/null; then
 fi
 
 echo "=== Jenkins Agent Setup Complete ==="
+
+# Connect to Jenkins Controller
+echo "Connecting to Jenkins Controller..."
+mkdir -p /home/ubuntu/jenkins
+cd /home/ubuntu/jenkins
+# Wait for controller to be ready and download agent.jar
+max_retries=10
+count=0
+while [ $count -lt $max_retries ]; do
+    wget -q http://${jenkins_controller_ip}:8080/jnlpJars/agent.jar && break
+    echo "Waiting for Jenkins Controller... ($count)"
+    sleep 15
+    count=$((count+1))
+done
+
+# Run agent in background
+java -jar agent.jar -url http://${jenkins_controller_ip}:8080/ -secret f02868531139a14796d477ca802cd6ac2d46403cb468058341b249c11f76c918 -name "jenkins-agent" -workDir "/home/ubuntu/jenkins" &

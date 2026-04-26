@@ -46,13 +46,21 @@ resource "aws_security_group" "jenkins_controller" {
   description = "Security group for Jenkins controller - port 8080 and 22 from user IP only"
   vpc_id      = data.aws_vpc.existing.id
 
-  # Ingress: HTTP from user's IP only
+  # Ingress: HTTP from user's IP and VPC
   ingress {
     description = "Jenkins UI from user IP"
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
     cidr_blocks = [var.your_ip_address]
+  }
+
+  ingress {
+    description = "Jenkins UI from within VPC"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
   }
 
   # Ingress: SSH from user's IP only
@@ -62,6 +70,15 @@ resource "aws_security_group" "jenkins_controller" {
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = [var.your_ip_address]
+  }
+
+  # Ingress: JNLP for Inbound Agents
+  ingress {
+    description = "JNLP for Agents"
+    from_port   = 50000
+    to_port     = 50000
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"] # Allow from within VPC
   }
 
   # Egress: Allow all outbound
@@ -92,8 +109,12 @@ resource "aws_instance" "jenkins_controller" {
   })
 
   tags = {
-    Name = "jenkins-controller"
     Role = "jenkins-controller"
+  }
+
+  root_block_device {
+    volume_size = 30
+    volume_type = "gp3"
   }
 }
 
@@ -226,6 +247,11 @@ resource "aws_instance" "jenkins_agent" {
   tags = {
     Name = "jenkins-agent"
     Role = "jenkins-agent"
+  }
+
+  root_block_device {
+    volume_size = 30
+    volume_type = "gp3"
   }
 }
 

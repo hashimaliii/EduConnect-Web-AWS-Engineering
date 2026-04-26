@@ -1,11 +1,15 @@
 # ECR Repository - Task 5
 # Provisions an AWS ECR private repository with lifecycle policy
 
+provider "aws" {
+  region = "us-east-1"
+}
+
 resource "aws_ecr_repository" "app" {
   name = "educonnect-app"
   
   # Image tag immutability
-  image_tag_immutability = "IMMUTABLE"
+  image_tag_mutability = "IMMUTABLE"
   
   # Image scanning on push
   image_scanning_configuration {

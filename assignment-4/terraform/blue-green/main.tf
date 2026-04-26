@@ -1,6 +1,10 @@
 # Blue-Green Deployment Infrastructure - Task 7
 # Creates two ASGs and two target groups for zero-downtime deployments
 
+provider "aws" {
+  region = "us-east-1"
+}
+
 # ================== BLUE ASG ==================
 
 # Launch Template for Blue Environment
