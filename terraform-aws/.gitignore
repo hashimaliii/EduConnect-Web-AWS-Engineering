@@ -31,3 +31,45 @@ terraform.rc
 # Custom: Ignore assignment PDFs and binary executables
 *.pdf
 *.exe
+
+# ================== NODE.JS ==================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# ================== TEST COVERAGE ==================
+coverage/
+.nyc_output/
+htmlcov/
+
+# ================== IDE ==================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ================== OS ==================
+.DS_Store
+Thumbs.db
+
+# ================== SECRETS ==================
+.env
+.env.local
+*.credentials
+
+# ================== BUILD ARTIFACTS ==================
+dist/
+target/
+*.tar.gz
+*.zip
+build/
+out/
+
+# ================== JENKINS ==================
+jenkins/secrets/
+*.key
+*.pem
