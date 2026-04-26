@@ -277,7 +277,7 @@ pipeline {
         // Always run - archive artifacts
         always {
             echo 'Archiving build artifacts...'
-            archiveArtifacts artifacts: 'app/**/*.json,app/**/*.js', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'assignment-4/app/**/*.json,assignment-4/app/**/*.js', allowEmptyArchive: true
             cleanWs()
         }
         
