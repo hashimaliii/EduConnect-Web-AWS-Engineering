@@ -9,7 +9,7 @@
 
 pipeline {
     // Use the linux-agent label from Task 1
-    agent { label 'linux-agent' }
+    agent { label 'jenkins-agent' }
     
     // Environment variables with credentials
     environment {
