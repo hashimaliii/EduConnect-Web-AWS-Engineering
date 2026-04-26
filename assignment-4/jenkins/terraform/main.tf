@@ -16,23 +16,21 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Import existing VPC from Assignment 3
 data "aws_vpc" "existing" {
-  id = "vpc-0c5f1a2b3d4e5f6g7"  # Replace with actual VPC ID from your environment
+  id = var.vpc_id  # Use variable instead of hardcoded ID
 }
 
-# Import existing subnets from Assignment 3
 data "aws_subnet" "public_1" {
-  id = "subnet-0a1b2c3d4e5f6g7h8"  # Replace with actual subnet ID
+  id = var.public_subnet_id  # Use variable instead of hardcoded ID
 }
 
 data "aws_subnet" "private_1" {
-  id = "subnet-0a1b2c3d4e5f6g7i9"  # Replace with actual subnet ID
+  id = var.private_subnet_id  # Use variable instead of hardcoded ID
 }
 
 # Import existing security groups
 data "aws_security_group" "alb_sg" {
-  id = "sg-0a1b2c3d4e5f6g7h8"  # Replace with actual ALB security group ID
+  id = var.alb_security_group_id  # Use variable instead of hardcoded ID
 }
 
 # Import existing key pair
@@ -82,7 +80,7 @@ resource "aws_security_group" "jenkins_controller" {
 # Jenkins Controller EC2
 resource "aws_instance" "jenkins_controller" {
   ami           = data.aws_ami.ubuntu.id
-  instance_type = "t3.medium"
+  instance_type = "t3.small"
   subnet_id     = data.aws_subnet.public_1.id
 
   vpc_security_group_ids = [aws_security_group.jenkins_controller.id]
@@ -211,7 +209,7 @@ resource "aws_iam_instance_profile" "jenkins_agent" {
 # Jenkins Agent EC2
 resource "aws_instance" "jenkins_agent" {
   ami           = data.aws_ami.ubuntu.id
-  instance_type = "t3.medium"
+  instance_type = "t3.small"
   subnet_id     = data.aws_subnet.private_1.id
 
   vpc_security_group_ids = [aws_security_group.jenkins_agent.id]
