@@ -56,7 +56,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building the application...'
-                dir('app') {
+                dir('assignment-4/app') {
                     sh '''
                         npm install
                         npm run lint || true
@@ -69,7 +69,7 @@ pipeline {
         stage('Static Analysis') {
             steps {
                 echo 'Running SonarQube analysis...'
-                dir('app') {
+                dir('assignment-4/app') {
                     withSonarQubeEnv('sonarqube') {
                         sh '''
                             npm run test:unit -- --coverage || true
@@ -95,7 +95,7 @@ pipeline {
                 stage('Unit Tests') {
                     steps {
                         echo 'Running unit tests...'
-                        dir('app') {
+                        dir('assignment-4/app') {
                             sh '''
                                 npm run test:unit -- --testReportPath=test-results/unit-results.xml
                             '''
@@ -103,9 +103,9 @@ pipeline {
                     }
                     post {
                         always {
-                            junit 'app/test-results/unit-results.xml'
+                            junit 'assignment-4/app/test-results/unit-results.xml'
                             publishHTML(target: [
-                                reportDir: 'app/coverage/lcov-report',
+                                reportDir: 'assignment-4/app/coverage/lcov-report',
                                 reportFiles: 'index.html',
                                 reportName: 'Unit Test Coverage Report'
                             ])
@@ -120,7 +120,7 @@ pipeline {
                     }
                     steps {
                         echo 'Running integration tests...'
-                        dir('app') {
+                        dir('assignment-4/app') {
                             sh '''
                                 npm run test:integration -- --testReportPath=test-results/integration-results.xml
                             '''
@@ -128,7 +128,7 @@ pipeline {
                     }
                     post {
                         always {
-                            junit 'app/test-results/integration-results.xml'
+                            junit 'assignment-4/app/test-results/integration-results.xml'
                         }
                     }
                 }
@@ -139,7 +139,7 @@ pipeline {
         stage('Package') {
             steps {
                 echo 'Packaging the application...'
-                dir('app') {
+                dir('assignment-4/app') {
                     sh '''
                         npm run build || true
                         tar -czf ${APP_NAME}.tar.gz src/ package*.json Dockerfile
@@ -148,7 +148,7 @@ pipeline {
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'app/*.tar.gz', fingerprint: true
+                    archiveArtifacts artifacts: 'assignment-4/app/*.tar.gz', fingerprint: true
                 }
             }
         }
@@ -157,7 +157,7 @@ pipeline {
         stage('Container Build') {
             steps {
                 echo 'Building Docker image...'
-                dir('app') {
+                dir('assignment-4/app') {
                     script {
                         env.IMAGE_TAG_SHA = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${SHORT_COMMIT}"
                         env.IMAGE_TAG_BRANCH = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${GIT_BRANCH}"
@@ -171,7 +171,7 @@ pipeline {
         stage('Security Scan') {
             steps {
                 echo 'Running Trivy vulnerability scanner...'
-                dir('app') {
+                dir('assignment-4/app') {
                     sh """
                         trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --ignorefile .trivyignore --format table ${IMAGE_TAG_SHA} > trivy-report.txt
                     """
@@ -179,7 +179,7 @@ pipeline {
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'app/trivy-report.txt', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'assignment-4/app/trivy-report.txt', allowEmptyArchive: true
                 }
             }
         }
