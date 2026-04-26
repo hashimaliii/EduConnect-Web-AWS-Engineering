@@ -7,8 +7,8 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "jest --coverage",
-    "test:unit": "jest tests/unit",
-    "test:integration": "jest tests/integration",
+    "test:unit": "jest tests/unit --reporters=default --reporters=jest-junit",
+    "test:integration": "jest tests/integration --reporters=default --reporters=jest-junit",
     "lint": "eslint src/"
   },
   "dependencies": {
@@ -22,6 +22,7 @@
     "supertest": "^6.3.3",
     "nodemon": "^3.0.2",
     "eslint": "^8.56.0",
+    "jest-junit": "^16.0.0",
     "nyc": "^15.1.0"
   },
   "jest": {

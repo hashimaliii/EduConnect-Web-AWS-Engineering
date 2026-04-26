@@ -96,9 +96,7 @@ pipeline {
                     steps {
                         echo 'Running unit tests...'
                         dir('assignment-4/app') {
-                            sh '''
-                                npm run test:unit -- --testReportPath=test-results/unit-results.xml
-                            '''
+                            sh 'JEST_JUNIT_OUTPUT_FILE="test-results/unit-results.xml" npm run test:unit'
                         }
                     }
                     post {
@@ -121,9 +119,7 @@ pipeline {
                     steps {
                         echo 'Running integration tests...'
                         dir('assignment-4/app') {
-                            sh '''
-                                npm run test:integration -- --testReportPath=test-results/integration-results.xml
-                            '''
+                            sh 'JEST_JUNIT_OUTPUT_FILE="test-results/integration-results.xml" npm run test:integration'
                         }
                     }
                     post {
