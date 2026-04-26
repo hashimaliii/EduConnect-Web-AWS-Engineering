@@ -27,7 +27,7 @@ pipeline {
     
     // Pipeline parameters
     parameters {
-        choice(name: 'ACTION', choices: ['build', 'deploy'], default: 'build')
+        choice(name: 'ACTION', choices: ['build', 'deploy'], description: 'Action to perform')
         booleanParam(name: 'RUN_INTEGRATION_TESTS', defaultValue: true, description: 'Run integration tests')
     }
     
@@ -90,9 +90,6 @@ pipeline {
         
         // Stage 3: Test (Parallel)
         stage('Test') {
-            steps {
-                echo 'Running tests in parallel...'
-            }
             parallel {
                 // Unit Tests
                 stage('Unit Tests') {
