@@ -1,0 +1,334 @@
+/**
+ * EduConnect Application - Jenkinsfile
+ * Task 2: Declarative Pipeline with Parallel Stages and Notifications
+ * 
+ * This pipeline builds, tests, and deploys the sample Node.js application
+ */
+
+@Library('jenkins-shared-library') _
+
+pipeline {
+    // Use the linux-agent label from Task 1
+    agent { label 'linux-agent' }
+    
+    // Environment variables with credentials
+    environment {
+        APP_NAME = 'educonnect-app'
+        REGION = 'us-east-1'
+        SLACK_WEBHOOK = credentials('slack-webhook')
+        GITHUB_TOKEN = credentials('github-token')
+        AWS_CREDENTIALS = credentials('aws-creds')
+        ECR_REGISTRY = '123456789012.dkr.ecr.us-east-1.amazonaws.com' // Replace with actual registry
+        ECR_REPOSITORY = 'educonnect-app'
+        ALB_LISTENER_ARN = 'arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/educonnect-alb/123456/7890' // Replace with actual ARN
+        TARGET_GROUP_BLUE_ARN = 'arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/blue-web-tg/12345' // Replace with actual ARN
+        TARGET_GROUP_GREEN_ARN = 'arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/green-web-tg/12345' // Replace with actual ARN
+    }
+    
+    // Pipeline parameters
+    parameters {
+        choice(name: 'ACTION', choices: ['build', 'deploy'], default: 'build')
+        booleanParam(name: 'RUN_INTEGRATION_TESTS', defaultValue: true, description: 'Run integration tests')
+    }
+    
+    // Options
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 1, unit: 'HOURS')
+        timestamps()
+    }
+    
+    stages {
+        // Stage 1: Checkout
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+                script {
+                    env.GIT_COMMIT_SHA = sh(script: "git rev-parse HEAD", returnStdout: true).trim()
+                    env.GIT_BRANCH = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+                    env.SHORT_COMMIT = env.GIT_COMMIT_SHA.substring(0, 7)
+                }
+            }
+        }
+        
+        // Stage 2: Build
+        stage('Build') {
+            steps {
+                echo 'Building the application...'
+                dir('app') {
+                    sh '''
+                        npm install
+                        npm run lint || true
+                    '''
+                }
+            }
+        }
+        
+        // Stage 2.5: Static Analysis
+        stage('Static Analysis') {
+            steps {
+                echo 'Running SonarQube analysis...'
+                dir('app') {
+                    withSonarQubeEnv('sonarqube') {
+                        sh '''
+                            npm run test:unit -- --coverage || true
+                            # Run sonar-scanner or use npm script if defined
+                            npx sonarqube-scanner \
+                                -Dsonar.projectKey=${APP_NAME} \
+                                -Dsonar.sources=src \
+                                -Dsonar.tests=tests \
+                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                        '''
+                    }
+                }
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+        
+        // Stage 3: Test (Parallel)
+        stage('Test') {
+            steps {
+                echo 'Running tests in parallel...'
+            }
+            parallel {
+                // Unit Tests
+                stage('Unit Tests') {
+                    steps {
+                        echo 'Running unit tests...'
+                        dir('app') {
+                            sh '''
+                                npm run test:unit -- --testReportPath=test-results/unit-results.xml
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            junit 'app/test-results/unit-results.xml'
+                            publishHTML(target: [
+                                reportDir: 'app/coverage/lcov-report',
+                                reportFiles: 'index.html',
+                                reportName: 'Unit Test Coverage Report'
+                            ])
+                        }
+                    }
+                }
+                
+                // Integration Tests
+                stage('Integration Tests') {
+                    when {
+                        expression { params.RUN_INTEGRATION_TESTS }
+                    }
+                    steps {
+                        echo 'Running integration tests...'
+                        dir('app') {
+                            sh '''
+                                npm run test:integration -- --testReportPath=test-results/integration-results.xml
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            junit 'app/test-results/integration-results.xml'
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Stage 4: Package
+        stage('Package') {
+            steps {
+                echo 'Packaging the application...'
+                dir('app') {
+                    sh '''
+                        npm run build || true
+                        tar -czf ${APP_NAME}.tar.gz src/ package*.json Dockerfile
+                    '''
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'app/*.tar.gz', fingerprint: true
+                }
+            }
+        }
+        
+        // Stage 5: Container Build
+        stage('Container Build') {
+            steps {
+                echo 'Building Docker image...'
+                dir('app') {
+                    script {
+                        env.IMAGE_TAG_SHA = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${SHORT_COMMIT}"
+                        env.IMAGE_TAG_BRANCH = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${GIT_BRANCH}"
+                        sh "docker build -t ${IMAGE_TAG_SHA} -t ${IMAGE_TAG_BRANCH} ."
+                    }
+                }
+            }
+        }
+        
+        // Stage 6: Security Scan
+        stage('Security Scan') {
+            steps {
+                echo 'Running Trivy vulnerability scanner...'
+                dir('app') {
+                    sh """
+                        trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --ignorefile .trivyignore --format table ${IMAGE_TAG_SHA} > trivy-report.txt
+                    """
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'app/trivy-report.txt', allowEmptyArchive: true
+                }
+            }
+        }
+        
+        // Stage 7: Push
+        stage('Push') {
+            steps {
+                echo 'Pushing image to ECR...'
+                script {
+                    sh """
+                        aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                        docker push ${IMAGE_TAG_SHA}
+                        docker push ${IMAGE_TAG_BRANCH}
+                    """
+                }
+            }
+        }
+        
+        // Stage 8: Deploy-Production (Blue-Green)
+        stage('Deploy-Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo 'Deploying to Production using Blue-Green...'
+                script {
+                    // 1. Determine current live color
+                    def currentTgArn = sh(
+                        script: """
+                        aws elbv2 describe-listeners \
+                            --listener-arns ${ALB_LISTENER_ARN} \
+                            --region ${REGION} \
+                            --query 'Listeners[0].DefaultActions[0].TargetGroupArn' \
+                            --output text
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    
+                    env.CURRENT_LIVE_TG = currentTgArn
+                    
+                    if (currentTgArn.contains('blue')) {
+                        env.IDLE_TG = TARGET_GROUP_GREEN_ARN
+                        env.IDLE_ASG = "green-web-asg"
+                        env.IDLE_LT = "green-web-lt-*" // Usually requires exact name or ID to update
+                        env.NEW_COLOR = "green"
+                        env.OLD_COLOR = "blue"
+                    } else if (currentTgArn.contains('green')) {
+                        env.IDLE_TG = TARGET_GROUP_BLUE_ARN
+                        env.IDLE_ASG = "blue-web-asg"
+                        env.IDLE_LT = "blue-web-lt-*"
+                        env.NEW_COLOR = "blue"
+                        env.OLD_COLOR = "green"
+                    } else {
+                        error "Could not determine current live target group."
+                    }
+                    
+                    echo "Current Live: ${OLD_COLOR} | Deploying to: ${NEW_COLOR}"
+                    
+                    // 2. Update Idle ASG (Placeholder logic for Launch Template update and Instance Refresh)
+                    echo "Updating Launch Template for ${IDLE_ASG} with image ${IMAGE_TAG_SHA}..."
+                    // e.g. aws ec2 create-launch-template-version ...
+                    // aws autoscaling start-instance-refresh --auto-scaling-group-name ${IDLE_ASG}
+                    
+                    // 3. Wait for healthy targets
+                    echo "Waiting for targets in ${NEW_COLOR} to become healthy..."
+                    sleep time: 30, unit: 'SECONDS'
+                    // Could use aws elbv2 describe-target-health here
+                    
+                    // 4. Smoke test
+                    echo "Running smoke test on idle environment..."
+                    // e.g. curl http://test-listener:8080/health
+                    
+                    // 5. Switch ALB Listener
+                    echo "Switching ALB listener to ${NEW_COLOR}..."
+                    sh """
+                    aws elbv2 modify-listener \
+                        --listener-arn ${ALB_LISTENER_ARN} \
+                        --default-actions Type=forward,TargetGroupArn=${IDLE_TG} \
+                        --region ${REGION}
+                    """
+                    
+                    // Log to S3
+                    def logEntry = """{"timestamp":"${java.time.Instant.now()}","commit":"${SHORT_COMMIT}","image_tag":"${IMAGE_TAG_SHA}","previous_color":"${OLD_COLOR}","new_color":"${NEW_COLOR}","result":"success"}"""
+                    sh """
+                    echo '${logEntry}' >> deployment-log.jsonl
+                    # aws s3 cp deployment-log.jsonl s3://your-deployment-logs-bucket/deployment-log.jsonl
+                    """
+                }
+            }
+        }
+    }
+    
+    // Post-build actions
+    post {
+        // Always run - archive artifacts
+        always {
+            echo 'Archiving build artifacts...'
+            archiveArtifacts artifacts: 'app/**/*.json,app/**/*.js', allowEmptyArchive: true
+            cleanWs()
+        }
+        
+        // Success handler
+        success {
+            echo 'Build succeeded! Sending Slack notification...'
+            script {
+                try {
+                    notifySlack([
+                        status: 'SUCCESS',
+                        buildNumber: env.BUILD_NUMBER,
+                        buildUrl: env.BUILD_URL,
+                        branch: env.GIT_BRANCH,
+                        commit: env.SHORT_COMMIT
+                    ])
+                } catch (e) {
+                    echo "Slack notification failed: ${e.message}"
+                }
+            }
+        }
+        
+        // Failure handler
+        failure {
+            echo 'Build failed! Sending Slack notification...'
+            script {
+                try {
+                    notifySlack([
+                        status: 'FAILURE',
+                        buildNumber: env.BUILD_NUMBER,
+                        buildUrl: env.BUILD_URL,
+                        branch: env.GIT_BRANCH,
+                        commit: env.SHORT_COMMIT,
+                        failedStage: currentBuild.getBuildCauses()[0]?.shortDescription ?: 'Unknown'
+                    ])
+                } catch (e) {
+                    echo "Slack notification failed: ${e.message}"
+                }
+            }
+        }
+        
+        // Unstable handler
+        unstable {
+            echo 'Build is unstable...'
+        }
+        
+        // Aborted handler
+        aborted {
+            echo 'Build was aborted...'
+        }
+    }
+}

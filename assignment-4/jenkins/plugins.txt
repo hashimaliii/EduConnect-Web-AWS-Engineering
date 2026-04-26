@@ -1,0 +1,33 @@
+# Jenkins Plugins - Task 1
+# Required plugins to be installed after initial Jenkins setup
+
+# Core plugins (suggested during setup)
+pipeline
+git
+github-branch-source
+docker-pipeline
+credentials-binding
+pipeline-utility-steps
+blue-ocean
+
+# Additional required plugins
+sonar-scanner
+job-dsl
+workflow-aggregator
+timestamper
+ansicolor
+slack
+email-ext
+junit
+htmlpublisher
+checkstyle
+pmd
+findbugs
+jacoco
+docker-compose-build-step
+ecr
+aws-secrets-manager-credentials
+parameterized-trigger
+conditional-buildstep
+copyartifact
+promoted-builds

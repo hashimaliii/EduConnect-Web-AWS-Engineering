@@ -1,0 +1,44 @@
+# Prometheus Configuration
+# Scrapes metrics from various exporters
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'educonnect-devops'
+    environment: 'dev'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files: []
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node Exporter (system metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Jenkins Exporter
+  - job_name: 'jenkins'
+    static_configs:
+      - targets: ['jenkins-exporter:9113']
+
+  # Docker metrics
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['host.docker.internal:9323']
+
+  # AWS CloudWatch (optional - requires credentials)
+  # - job_name: 'aws-cloudwatch'
+  #   scrape_interval: 5m
+  #   static_configs:
+  #     - targets: []
