@@ -16,8 +16,8 @@ pipeline {
         APP_NAME = 'educonnect-app'
         REGION = 'us-east-1'
         SLACK_WEBHOOK = credentials('slack-webhook')
-        GITHUB_TOKEN = credentials('github-token')
-        AWS_CREDENTIALS = credentials('aws-creds')
+        // GITHUB_TOKEN = credentials('github-token')
+        // AWS_CREDENTIALS = credentials('aws-creds')
         ECR_REGISTRY = '608051150213.dkr.ecr.eu-north-1.amazonaws.com'
         ECR_REPOSITORY = 'educonnect-app'
         ALB_LISTENER_ARN = 'arn:aws:elasticloadbalancing:us-east-1:608051150213:listener/app/dev-web-alb/b418ffdab15f292a/821f5fb103b41315'
