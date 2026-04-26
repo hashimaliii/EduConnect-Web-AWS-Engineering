@@ -70,7 +70,7 @@ pipeline {
             steps {
                 echo 'Running SonarQube analysis...'
                 dir('assignment-4/app') {
-                    withSonarQubeEnv('sonarqube') {
+                    withSonarQubeEnv('SonarQube') {
                         sh '''
                             npm run test:unit -- --coverage || true
                             # Run sonar-scanner or use npm script if defined
