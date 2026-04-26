@@ -1,8 +1,9 @@
 #!/bin/bash
 # Jenkins Controller User Data Script
-# Installs: Java 17, Git, Docker, AWS CLI, Terraform, Jenkins LTS
+# Installs: Java 17, Git, Docker, AWS CLI, Terraform, Jenkins LTS, Trivy
 
-set -e
+# Redirect all output to log file for debugging
+exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
 echo "=== Starting Jenkins Controller Setup ==="
 
@@ -50,22 +51,21 @@ if ! command -v terraform &> /dev/null; then
     rm /tmp/terraform.zip
 fi
 
-# Install Trivy for vulnerability scanning (Task 5)
+# Install Trivy using official repository (More reliable)
 echo "Installing Trivy..."
 if ! command -v trivy &> /dev/null; then
-    wget -q https://github.com/aquasecurity/trivy/releases/download/v0.51.1/trivy_0.51.1_Linux-64bit.tar.gz -O /tmp/trivy.tar.gz
-    tar -xzf /tmp/trivy.tar.gz -C /usr/local/bin/
-    rm /tmp/trivy.tar.gz
+    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+    apt-get update -y
+    apt-get install trivy -y
 fi
 
 # Add Jenkins APT repository and install Jenkins
 echo "Installing Jenkins LTS..."
 if ! command -v jenkins &> /dev/null; then
-    # Add Jenkins key
-    wget -q -O - https://pkg.jenkins.io/debian/jenkins.io.key | apt-key add -
-    
-    # Add Jenkins repository
-    sh -c 'echo deb https://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'
+    # Add Jenkins key using non-deprecated method
+    curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+    echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
     
     # Update and install Jenkins
     apt-get update -y
@@ -83,7 +83,7 @@ if ! command -v node &> /dev/null; then
     apt-get install -y nodejs
 fi
 
-# Install Docker Compose (for SonarQube in Task 4)
+# Install Docker Compose
 echo "Installing Docker Compose..."
 if ! command -v docker-compose &> /dev/null; then
     curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -91,5 +91,5 @@ if ! command -v docker-compose &> /dev/null; then
 fi
 
 echo "=== Jenkins Controller Setup Complete ==="
-echo "Jenkins will be available at http://<public-ip>:8080"
-echo "Initial admin password can be retrieved with: sudo cat /var/lib/jenkins/secrets/initialAdminPassword"
+echo "Jenkins Initial Admin Password:"
+cat /var/lib/jenkins/secrets/initialAdminPassword || echo "Jenkins not started yet"

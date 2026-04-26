@@ -1,9 +1,9 @@
 #!/bin/bash
 # Jenkins Agent User Data Script
-# Installs: Java 17, Git, Docker, AWS CLI, Terraform, Node.js, Trivy
-# Connects to Jenkins controller via SSH
+# Installs: Java 17, Git, Docker, AWS CLI, Terraform, Node.js, Trivy, SonarQube Scanner
 
-set -e
+# Redirect all output to log file for debugging
+exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
 echo "=== Starting Jenkins Agent Setup ==="
 
@@ -54,17 +54,17 @@ fi
 # Install tfsec for Terraform security scanning (Task 6)
 echo "Installing tfsec..."
 if ! command -v tfsec &> /dev/null; then
-    wget -q https://github.com/aquasecurity/tfsec/releases/download/v1.28.4/tfsec_1.28.4_linux_amd64.tar.gz -O /tmp/tfsec.tar.gz
-    tar -xzf /tmp/tfsec.tar.gz -C /usr/local/bin/ tfsec
-    rm /tmp/tfsec.tar.gz
+    wget -q https://github.com/aquasecurity/tfsec/releases/download/v1.28.4/tfsec_1.28.4_linux_amd64 -O /usr/local/bin/tfsec
+    chmod +x /usr/local/bin/tfsec
 fi
 
-# Install Trivy for vulnerability scanning (Task 5)
+# Install Trivy using official repository
 echo "Installing Trivy..."
 if ! command -v trivy &> /dev/null; then
-    wget -q https://github.com/aquasecurity/trivy/releases/download/v0.51.1/trivy_0.51.1_Linux-64bit.tar.gz -O /tmp/trivy.tar.gz
-    tar -xzf /tmp/trivy.tar.gz -C /usr/local/bin/
-    rm /tmp/trivy.tar.gz
+    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+    apt-get update -y
+    apt-get install trivy -y
 fi
 
 # Install Node.js (for sample app in Task 2)
@@ -74,7 +74,7 @@ if ! command -v node &> /dev/null; then
     apt-get install -y nodejs
 fi
 
-# Install Python and pip (for Python sample app option)
+# Install Python and pip
 echo "Installing Python..."
 apt-get install -y python3 python3-pip python3-venv
 
@@ -90,7 +90,7 @@ fi
 # Add /opt/sonar-scanner/bin to PATH
 echo 'export PATH=$PATH:/opt/sonar-scanner/bin' >> /etc/profile.d/sonar-scanner.sh
 
-# Install Docker Compose (for SonarQube in Task 4)
+# Install Docker Compose
 echo "Installing Docker Compose..."
 if ! command -v docker-compose &> /dev/null; then
     curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -98,5 +98,3 @@ if ! command -v docker-compose &> /dev/null; then
 fi
 
 echo "=== Jenkins Agent Setup Complete ==="
-echo "Agent will connect to Jenkins controller at: ${jenkins_controller_ip}"
-echo "Agent label: ${jenkins_agent_label}"
