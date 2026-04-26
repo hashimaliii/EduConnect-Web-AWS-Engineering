@@ -1,0 +1,33 @@
+# Local .terraform directories (contains providers and modules)
+**/.terraform/*
+
+# .tfstate files (contains sensitive data and shouldn't be in git)
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Exclude plan files (these often contain sensitive data/secrets)
+tfplan
+*tfplan*
+
+# Terraform variables (only ignore .tfvars if they contain secrets)
+# It is common practice to ignore all tfvars and provide a .example file instead
+*.tfvars
+*.tfvars.json
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+# Custom: Ignore assignment PDFs and binary executables
+*.pdf
+*.exe
