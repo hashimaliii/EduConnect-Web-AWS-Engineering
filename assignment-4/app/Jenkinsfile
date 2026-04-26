@@ -102,11 +102,13 @@ pipeline {
                     post {
                         always {
                             junit 'assignment-4/app/test-results/unit-results.xml'
+/*
                             publishHTML(target: [
                                 reportDir: 'assignment-4/app/coverage/lcov-report',
                                 reportFiles: 'index.html',
                                 reportName: 'Unit Test Coverage Report'
                             ])
+*/
                         }
                     }
                 }
