@@ -36,16 +36,10 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production && \
-    npm cache clean --force
-
 # Copy built application from builder
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
 
 # Change ownership to non-root user
 RUN chown -R nodejs:nodejs /app

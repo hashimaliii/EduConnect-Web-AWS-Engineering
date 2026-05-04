@@ -124,7 +124,7 @@ pipeline {
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'environments/dev/tfplan.txt', allowEmptyArchive: true
+                    archiveArtifacts artifacts: "${env.TF_WORKING_DIR}/tfplan,${env.TF_WORKING_DIR}/tfplan.txt", allowEmptyArchive: true
                 }
             }
         }
