@@ -21,6 +21,8 @@ pipeline {
         ECR_REGISTRY = '608051150213.dkr.ecr.us-east-1.amazonaws.com'
         ECR_REPOSITORY = 'educonnect-app'
         ALB_LISTENER_ARN = 'arn:aws:elasticloadbalancing:us-east-1:608051150213:listener/app/dev-web-alb/b418ffdab15f292a/a6676074084b9b79'
+        ALB_TEST_LISTENER_ARN = 'arn:aws:elasticloadbalancing:us-east-1:608051150213:listener/app/dev-web-alb/b418ffdab15f292a/749c58ecdace7221'
+        ALB_DNS = 'dev-web-alb-1561964467.us-east-1.elb.amazonaws.com'
         TARGET_GROUP_BLUE_ARN = 'arn:aws:elasticloadbalancing:us-east-1:608051150213:targetgroup/blue-web-tg/5ac7eead8cbcbb80'
         TARGET_GROUP_GREEN_ARN = 'arn:aws:elasticloadbalancing:us-east-1:608051150213:targetgroup/green-web-tg/e4068da3538026da'
         DEPLOYMENT_LOG_BUCKET = 'educonnect-deployment-logs-608051150213'
@@ -263,9 +265,21 @@ pipeline {
                             --region ${REGION}
                     """
                     
-                    // 4. Smoke test
-                    echo "Running smoke test on idle environment..."
-                    sh "curl -f http://52.73.31.40:8080/health || (echo 'Smoke test failed!' && exit 1)"
+                    // 4. Smoke test (Using ALB Test Listener on port 8080)
+                    echo "Running smoke test on ${NEW_COLOR} environment via ALB port 8080..."
+                    sh """
+                        # Point the test listener to the NEW target group
+                        aws elbv2 modify-listener \
+                            --listener-arn ${ALB_TEST_LISTENER_ARN} \
+                            --default-actions Type=forward,TargetGroupArn=${IDLE_TG} \
+                            --region ${REGION}
+                        
+                        # Wait for rule propagation
+                        sleep 10
+                        
+                        # Run smoke test
+                        curl -f http://${ALB_DNS}:8080/health || (echo 'Smoke test failed!' && exit 1)
+                    """
                     
                     // 5. Switch ALB Listener
                     echo "Switching ALB listener to ${NEW_COLOR}..."
