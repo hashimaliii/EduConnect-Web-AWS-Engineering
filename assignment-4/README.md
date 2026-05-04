@@ -1,168 +1,96 @@
-# EduConnect DevOps Assignment 4
+# EduConnect CI/CD Implementation - Assignment 4
+## AWS Cloud Engineering & Automation
 
-CI/CD Pipelines with Jenkins and Groovy - Complete project structure and code.
+This repository contains the full end-to-end CI/CD solution for the EduConnect application, leveraging Jenkins, Docker, Terraform, and AWS. It implements a zero-downtime **Blue-Green Deployment** strategy with automated security scanning and code quality enforcement.
 
-## Project Overview
+---
 
-This project implements a complete CI/CD pipeline using Jenkins and Groovy on AWS infrastructure from Assignment 3. It includes:
+## 🏗️ 1. Architecture & Infrastructure
+The infrastructure is provisioned entirely via **Terraform**, ensuring consistency and version control.
 
-- Jenkins controller and agent setup
-- Sample Node.js application with tests
-- Declarative pipelines with parallel stages
-- Jenkins shared library in Groovy
-- SonarQube integration for code quality
-- Docker build, vulnerability scanning, and ECR push
-- Terraform CI/CD pipeline
-- Blue-Green deployment to AWS
+### Core Components:
+- **Jenkins Ecosystem**:
+    - **Controller**: Hosted on a `t3.small` Ubuntu instance. Manages job scheduling and the UI.
+    - **Linux Agent**: A separate instance in a private subnet, connected via SSH. All builds run here to keep the controller secure.
+- **SonarQube Server**: A dedicated `t3.small` instance running SonarQube via Docker.
+- **Network Stack**: Built on the VPC from Assignment 3, utilizing public subnets for the ALB and private subnets for application workloads.
+- **Blue-Green Setup**:
+    - **ALB**: Single Load Balancer with two listeners (Port 80 for Production, Port 8080 for Smoke Testing).
+    - **ASGs**: Two Auto Scaling Groups (`blue-web-asg` and `green-web-asg`) that rotate roles during deployment.
 
-## Directory Structure
+---
 
-```
-assignment-4/
-├── app/                          # Sample application (Node.js + Express)
-│   ├── src/                      # Application source code
-│   │   ├── index.js              # Main entry point
-│   │   └── routes/               # API routes
-│   │       ├── health.js         # Health check endpoint
-│   │       └── users.js          # Users API
-│   ├── tests/                    # Test files
-│   │   ├── unit/                 # Unit tests
-│   │   └── integration/          # Integration tests
-│   ├── Dockerfile                # Multi-stage Dockerfile
-│   ├── Jenkinsfile               # Main pipeline
-│   └── package.json              # Node.js dependencies
-│
-├── jenkins/                      # Task 1: Jenkins Setup
-│   ├── terraform/                # Terraform for Jenkins infra
-│   │   ├── main.tf              # Main configuration
-│   │   ├── controller.tf        # Jenkins controller
-│   │   ├── agent.tf              # Jenkins agent
-│   │   ├── user_data.sh         # Controller user data
-│   │   ├── agent_user_data.sh   # Agent user data
-│   │   ├── variables.tf         # Variables
-│   │   └── outputs.tf            # Outputs
-│   ├── plugins.txt              # Required Jenkins plugins
-│   └── setup.md                 # Setup guide
-│
-│
-├── terraform/                    # Infrastructure
-│   ├── ecr/                     # Task 5: ECR repository
-│   │   └── main.tf
-│   ├── blue-green/              # Task 7: Blue-Green deployment
-│   │   ├── main.tf
-│   │   └── variables.tf
-│   └── infra-pipeline/          # Task 6: Terraform CI/CD
-│       └── Jenkinsfile
-│
-├── observability/               # Monitoring
-│   ├── docker-compose.yml      # SonarQube, Prometheus, Grafana
-│   ├── prometheus.yml           # Prometheus config
-│   └── dashboards/              # Grafana dashboards
-│       └── jenkins-dashboard.json
-│
-├── environments/                # Assignment 3 infrastructure
-│   └── dev/
-│       ├── main.tf
-│       ├── variables.tf
-│       ├── task3_s3_backend.tf
-│       ├── task4_asg_cloudwatch.tf
-│       └── task5_alb.tf
-│
-├── modules/                     # Reusable Terraform modules
-│   ├── compute/
-│   ├── security/
-│   └── vpc/
-│
-└── README.md                    # This file
-```
+## 📂 2. Repository Deep Dive
 
-## Prerequisites
+### `/app` - The Application Layer
+- **Node.js/Express**: A RESTful API with `/health` and `/api/users` endpoints.
+- **Testing Suite**: 
+    - **Unit Tests**: 6 tests verifying core logic and middleware.
+    - **Integration Tests**: 5 tests verifying the full HTTP request/response cycle using `supertest`.
+- **Dockerfile**:
+    - **Multi-stage Build**: A `builder` stage for dependencies and a `runtime` stage for execution.
+    - **Security**: Runs as a non-root `nodejs` user. Contains only production dependencies (no build tools).
 
-1. **AWS Account**: Active AWS account with appropriate permissions
-2. **SSH Key**: Key pair named `educonnect-key` in AWS
-3. **GitHub Repository**: Private repository for your team
-4. **Packer AMI**: Custom AMI from Assignment 3
+### `/pipelines` - The Logic Layer
+- **`app.Jenkinsfile`**: The "Brain" of the project.
+    - **Parallel Execution**: Unit and Integration tests run simultaneously to reduce build time.
+    - **Security Scanning**: Integrated **Trivy** scan that fails the build if `HIGH` or `CRITICAL` vulnerabilities are found.
+    - **Blue-Green Logic**: 
+        - Queries AWS to find the current live Target Group.
+        - Updates the **Launch Template** of the idle environment with the new ECR Image ID.
+        - Triggers an **Instance Refresh** to roll out new instances.
+        - Automatically switches the ALB listener only after a successful 200 OK health check on port 8080.
+- **`infra.Jenkinsfile`**:
+    - Implements **Terraform Security Scanning** (`tfsec`).
+    - Enforces a "Plan-then-Approve" workflow by archiving the binary `tfplan` as a Jenkins artifact.
 
-## Quick Start
+### `/terraform` - The Foundation
+- **`blue-green/`**: Defines the ALB rules, Target Groups, and ASGs.
+- **`jenkins/`**: Provisioning scripts for the Jenkins controller, including `user_data` for automated tool installation.
 
-### Step 1: Deploy Jenkins Infrastructure
+---
 
-```bash
-cd jenkins/terraform
+## 🔒 3. Security Implementation
+- **Non-Plaintext Secrets**: All credentials (AWS, GitHub, Slack, Sonar) are handled via Jenkins Credentials Binding. No tokens are committed to Git.
+- **Container Security**: 
+    - Minimal Alpine-based images.
+    - Trivy vulnerability scanning at the build stage.
+- **Network Security**: Port 8080 is restricted to specific IPs. The Jenkins Agent resides in a private subnet with no direct internet ingress.
 
-# Create terraform.tfvars
-cat > terraform.tfvars << EOF
-your_ip_address = "YOUR_IP/32"
-jenkins_agent_label = "linux-agent"
-create_ecr_iam_role = true
-EOF
+---
 
-# Initialize and apply
-terraform init
-terraform plan
-terraform apply
-```
+## 📊 4. Monitoring & Logging
+- **S3 Deployment Logs**: Every successful deployment appends a JSON entry to `s3://educonnect-deployment-logs-...` containing:
+    - Timestamp
+    - Commit SHA
+    - Previous vs New Color
+- **Prometheus/Grafana**: Configured in `/observability` to scrape metrics from the Node.js application and Jenkins.
 
-### Step 2: Configure Jenkins
+---
 
-1. Access Jenkins at `http://<CONTROLLER_IP>:8080`
-2. Complete initial setup wizard
-3. Install required plugins (see `jenkins/plugins.txt`)
-4. Configure credentials in Jenkins UI
-5. Add Jenkins agent via SSH
+## 🛠️ 5. Troubleshooting & Maintenance
 
-### Step 3: Deploy Sample Application
+### How to Rollback
+If a production issue is detected after a successful deploy:
+1. Go to Jenkins.
+2. Run the **Rollback-Pipeline**.
+3. It will instantly flip the ALB listener back to the previous stable Target Group.
 
-```bash
-cd app
-npm install
-npm test
-```
+### Updating Infrastructure
+1. Modify the `.tf` files in `terraform/`.
+2. Push to Git.
+3. Run the **Infra-Pipeline**.
+4. Review the `tfplan` artifact and click "Approve" in Jenkins.
 
-### Step 4: Run Pipeline
+---
 
-1. Create Multibranch Pipeline job in Jenkins
-2. Connect to your GitHub repository
-3. Add GitHub webhook for automatic triggers
+## 👥 6. Contribution Table
 
-## Task Summary
+| Member Name | Tasks Handled | Contribution % |
+| :--- | :--- | :---: |
+| **Hashim Ali** | Jenkins Setup, Blue-Green Logic, Terraform, Docker | 100% |
+| **Partner Name** | [Add Details] | -- |
 
-| Task | Description | Files |
-|------|-------------|-------|
-| 1 | Jenkins Installation | `jenkins/` |
-| 2 | Declarative Pipeline | `app/Jenkinsfile` |
-| 3 | Shared Library | Separated to its own repository |
-| 4 | SonarQube | `jenkins/terraform/sonarqube.tf`, `observability/` |
-| 5 | Docker + ECR | `app/Dockerfile`, `terraform/ecr/` |
-| 6 | Terraform CI/CD | `terraform/infra-pipeline/` |
-| 7 | Blue-Green | `terraform/blue-green/` |
-
-## Credentials Required
-
-Create these credentials in Jenkins (Manage Jenkins → Credentials):
-
-| ID | Type | Purpose |
-|----|------|---------|
-| `aws-creds` | AWS Credentials | AWS API access |
-| `github-token` | Secret text | GitHub access |
-| `slack-webhook` | Secret text | Slack notifications |
-| `ecr-creds` | Username/password | ECR login |
-| `sonarqube-token` | Secret text | SonarQube access |
-
-## Team Contribution
-
-| Member | Tasks |
-|--------|-------|
-| [Team Member 1] | Task 1, Task 2, Task 3 |
-| [Team Member 2] | Task 4, Task 5, Task 6, Task 7 |
-
-## Important Notes
-
-- **DO NOT** commit credentials or secrets to the repository
-- Use Jenkins credentials for all sensitive data
-- Follow Git workflow: branch per task, PR to main
-- Document all changes in README
-
-## License
-
-MIT License
+---
+**Submission Date**: May 5, 2026
+**Course**: Advanced AWS Cloud Engineering
